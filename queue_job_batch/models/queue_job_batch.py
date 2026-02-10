@@ -5,6 +5,7 @@
 from odoo import api, fields, models
 
 from odoo.addons.mail.tools.discuss import Store
+from odoo.addons.queue_job.exception import RetryableJobError
 
 
 class QueueJobBatch(models.Model):
@@ -108,6 +109,12 @@ class QueueJobBatch(models.Model):
             rec.finished_job_count = len(jobs_by_state.get("done", []))
             rec.completeness = rec.finished_job_count / max(1, rec.job_count)
             rec.failed_percentage = rec.failed_job_count / max(1, rec.job_count)
+
+    def _on_finished(self):
+        self.ensure_one()
+        self.check_state()
+        if self.state != "finished":
+            raise RetryableJobError(f"{self.name} {100.0 * self.completeness}%")
 
     @api.model
     def _to_store_fnames(self):
